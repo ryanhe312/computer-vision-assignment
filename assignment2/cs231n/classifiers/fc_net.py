@@ -182,6 +182,9 @@ class FullyConnectedNet(object):
         for i in range(1,self.num_layers+1):
             self.params['W%d'%i]=np.random.normal(0.0,weight_scale,(hidden_dims[i-1],hidden_dims[i]))
             self.params['b%d'%i]=np.zeros(hidden_dims[i])
+            if self.normalization=='batchnorm' and i<self.num_layers:
+                self.params['gamma%d'%i]=np.ones(hidden_dims[i])
+                self.params['beta%d'%i]=np.zeros(hidden_dims[i])
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -246,6 +249,8 @@ class FullyConnectedNet(object):
         out=X
         for i in range(1,self.num_layers):
             out, cache['affine%d'%i] = affine_forward(out, self.params['W%d'%i], self.params['b%d'%i])
+            if self.normalization=='batchnorm':
+                out, cache['batch%d'%i] = batchnorm_forward(out, self.params['gamma%d'%i], self.params['beta%d'%i], self.bn_params[i-1])
             out, cache['relu%d'%i] = relu_forward(out)
         scores, cache['affine%d'%self.num_layers] = affine_forward(out, self.params['W%d'%self.num_layers], self.params['b%d'%self.num_layers])
         ############################################################################
@@ -274,10 +279,14 @@ class FullyConnectedNet(object):
         loss, dout = softmax_loss(scores, y)
         loss+=0.5 * reg * np.sum([np.sum(np.square(self.params['W%d'%i])) for i in range(1,self.num_layers+1)])
         
+        
+        
         dout, grads['W%d'%self.num_layers], grads['b%d'%self.num_layers] = affine_backward(dout, cache['affine%d'%self.num_layers])
         grads['W%d'%self.num_layers]+= reg * self.params['W%d'%self.num_layers]
         for i in reversed(range(1,self.num_layers)):
             dout = relu_backward(dout,cache['relu%d'%i])
+            if self.normalization=='batchnorm':
+                dout, grads['gamma%d'%i],grads['beta%d'%i] = batchnorm_backward(dout, cache['batch%d'%i])
             dout, grads['W%d'%i], grads['b%d'%i] = affine_backward(dout, cache['affine%d'%i])
             grads['W%d'%i]+= reg * self.params['W%d'%i]
 
