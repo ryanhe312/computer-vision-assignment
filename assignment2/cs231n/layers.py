@@ -547,14 +547,14 @@ def conv_backward_naive(dout, cache):
     F, C, HH, WW = w.shape
     stride, pad = conv_param['stride'], conv_param['pad']
     
-    H_prime = int(1 + (H + 2 * pad - HH) / stride)
-    W_prime = int(1 + (W + 2 * pad - WW) / stride)
+    N, F,H_prime,W_prime = dout.shape
     
     x_pad=np.zeros(N*C*(H+2*pad)*(W+2*pad)).reshape(N, C,H+2*pad, W+2*pad)
     x_pad[:,:,pad:H+pad,pad:W+pad]=x
     
     dx_pad=np.zeros(x_pad.shape)
     dw=np.zeros(w.shape)
+    
     for i in range(0,H_prime):
         for j in range(0,W_prime):
             dw[:,:,:,:]+=np.sum(x_pad[:,None,:,i*stride:i*stride+HH,j*stride:j*stride+WW]*dout[:,:,None,i,j][:,:,:,None,None],axis=0)
@@ -591,7 +591,17 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
-    pass
+    N, C, H, W = x.shape
+    pool_height,pool_width,stride=pool_param['pool_height'],pool_param['pool_width'],pool_param['stride']
+    
+    H_prime = int(1 + (H - pool_height) / stride)
+    W_prime = int(1 + (W - pool_width) / stride)
+    
+    out=np.zeros(N*C*H_prime*W_prime).reshape((N, C, H_prime, W_prime))
+
+    for i in range(0,H_prime):
+        for j in range(0,W_prime):
+            out[:,:,i,j]=np.max(x[:,:,i*stride:i*stride+pool_height,j*stride:j*stride+pool_width],axis=(2,3))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -614,7 +624,21 @@ def max_pool_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
-    pass
+    x, pool_param = cache
+    
+    N, C, H, W = x.shape
+    pool_height,pool_width,stride=pool_param['pool_height'],pool_param['pool_width'],pool_param['stride']
+    
+    N, C,H_prime,W_prime = dout.shape
+    
+    dx=np.zeros(x.shape)
+
+    for i in range(0,H_prime):
+        for j in range(0,W_prime):
+            x_mask=x[:,:,i*stride:i*stride+pool_height,j*stride:j*stride+pool_width]
+            dx_mask=dx[:,:,i*stride:i*stride+pool_height,j*stride:j*stride+pool_width]
+            dx_mask+=(x_mask==np.max(x_mask,axis=(2,3),keepdims=True))*dout[:,:,i,j][:,:,None,None]
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
