@@ -492,7 +492,32 @@ def conv_forward_naive(x, w, b, conv_param):
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    pass
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+    stride, pad = conv_param['stride'], conv_param['pad']
+    
+    x_pad=np.zeros(N*C*(H+2*pad)*(W+2*pad)).reshape(N, C,H+2*pad, W+2*pad)
+    x_pad[:,:,pad:H+pad,pad:W+pad]=x
+    
+    H_prime = int(1 + (H + 2 * pad - HH) / stride)
+    W_prime = int(1 + (W + 2 * pad - WW) / stride)
+    out= np.zeros(N*F*H_prime*W_prime).reshape(N, F, H_prime, W_prime)
+    
+    """
+    naive:
+    
+    for n in range(N):
+        for f in range(F):
+            for c in range(C):
+                for i in range(0,H_prime):
+                    for j in range(0,W_prime):
+                        out[n,f,i,j] += np.sum(x_pad[n,c,i*stride:i*stride+HH,j*stride:j*stride+WW] * w[f,c,:,:]) + b[f]
+    """
+    
+    for i in range(0,H_prime):
+        for j in range(0,W_prime):
+            out[:,:,i,j] = np.sum(x_pad[:,None,:,i*stride:i*stride+HH,j*stride:j*stride+WW] * w[None,:,:,:,:],(2,3,4)) + b
+                    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -517,7 +542,26 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
-    pass
+    x, w, b, conv_param = cache
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+    stride, pad = conv_param['stride'], conv_param['pad']
+    
+    H_prime = int(1 + (H + 2 * pad - HH) / stride)
+    W_prime = int(1 + (W + 2 * pad - WW) / stride)
+    
+    x_pad=np.zeros(N*C*(H+2*pad)*(W+2*pad)).reshape(N, C,H+2*pad, W+2*pad)
+    x_pad[:,:,pad:H+pad,pad:W+pad]=x
+    
+    dx_pad=np.zeros(x_pad.shape)
+    dw=np.zeros(w.shape)
+    for i in range(0,H_prime):
+        for j in range(0,W_prime):
+            dw[:,:,:,:]+=np.sum(x_pad[:,None,:,i*stride:i*stride+HH,j*stride:j*stride+WW]*dout[:,:,None,i,j][:,:,:,None,None],axis=0)
+            dx_pad[:,:,i*stride:i*stride+HH,j*stride:j*stride+WW]+=np.sum(w[None,:,:,:,:]*dout[:,:,None,i,j][:,:,:,None,None],axis=1)
+    
+    db = np.sum(dout,(0,2,3))
+    dx = dx_pad[:,:,pad:-pad,pad:-pad]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
