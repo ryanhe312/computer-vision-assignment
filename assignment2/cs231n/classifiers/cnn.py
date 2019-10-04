@@ -53,7 +53,31 @@ class ThreeLayerConvNet(object):
         # **the width and height of the input are preserved**. Take a look at      #
         # the start of the loss() function to see how that happens.                #                           
         ############################################################################
-        pass
+        C, H, W = input_dim
+        HH = WW = filter_size
+        F = num_filters
+        
+        conv_stride = 1
+        conv_pad = (filter_size - 1) // 2
+        
+        H_prime_conv = 1 + (H + 2 * conv_pad - HH) // conv_stride
+        W_prime_conv = 1 + (W + 2 * conv_pad - WW) // conv_stride
+        
+        pool_height = 2
+        pool_width = 2
+        pool_stride = 2
+        
+        H_prime_pool = 1 + (H_prime_conv - pool_height) // pool_stride
+        W_prime_pool = 1 + (W_prime_conv - pool_width) // pool_stride
+        
+        flattened = F*H_prime_pool*W_prime_pool
+        
+        self.params['W1']=np.random.normal(0.0,weight_scale,(F,C,HH,WW))
+        self.params['W2']=np.random.normal(0.0,weight_scale,(flattened,hidden_dim))
+        self.params['W3']=np.random.normal(0.0,weight_scale,(hidden_dim,num_classes))
+        self.params['b1']=np.zeros(F)
+        self.params['b2']=np.zeros(hidden_dim)
+        self.params['b3']=np.zeros(num_classes)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -89,7 +113,14 @@ class ThreeLayerConvNet(object):
         # Remember you can use the functions defined in cs231n/fast_layers.py and  #
         # cs231n/layer_utils.py in your implementation (already imported).         #
         ############################################################################
-        pass
+        flattened=W2.shape[0]
+        N=X.shape[0]
+        
+        out = X
+        out,cache1=conv_relu_pool_forward(out, W1, b1, conv_param, pool_param)
+        out=out.reshape((N,flattened))
+        out,cache2=affine_relu_forward(out, W2, b2)
+        scores,cache3=affine_forward(out, W3, b3)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -108,7 +139,38 @@ class ThreeLayerConvNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+        F,C,HH,WW = W1.shape
+        N,C,H,W = X.shape
+        filter_size = HH
+        
+        conv_stride = 1
+        conv_pad = (filter_size - 1) // 2
+        
+        H_prime_conv = 1 + (H + 2 * conv_pad - HH) // conv_stride
+        W_prime_conv = 1 + (W + 2 * conv_pad - WW) // conv_stride
+        
+        pool_height = 2
+        pool_width = 2
+        pool_stride = 2
+        
+        H_prime_pool = 1 + (H_prime_conv - pool_height) // pool_stride
+        W_prime_pool = 1 + (W_prime_conv - pool_width) // pool_stride
+        
+        reg = self.reg
+        loss, dout = softmax_loss(scores, y)
+        loss+=0.5 * reg * (np.sum(W1*W1)+np.sum(W2*W2)+np.sum(W3*W3))
+        
+        dout, dW3, db3 = affine_backward(dout, cache3)
+        dW3+= reg * W3
+        dout, dW2, db2 = affine_relu_backward(dout, cache2)
+        dW2+= reg * W2
+        dout = dout.reshape((N,F,H_prime_pool,W_prime_pool))
+        dout, dW1, db1 = conv_relu_pool_backward(dout, cache1)
+        dW1+= reg * W1
+        
+        grads['W1'],grads['b1']=dW1,db1
+        grads['W2'],grads['b2']=dW2,db2
+        grads['W3'],grads['b3']=dW3,db3
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
